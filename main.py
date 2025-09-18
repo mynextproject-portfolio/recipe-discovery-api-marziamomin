@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Response, status, Query
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -57,7 +57,7 @@ async def get_all_recipes():
     return {"recipes": [recipe.model_dump() for recipe in recipes]}
 
 @app.get("/recipes/search")
-async def search_recipes(q: str | None = Query(default=None)):
+async def search_recipes(q: Optional[str] = Query(default=None)):
     if not q:
         return {"recipes": []}
     q_lower = q.lower()

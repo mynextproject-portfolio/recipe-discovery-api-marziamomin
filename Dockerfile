@@ -10,8 +10,10 @@ COPY requirements.txt .
 # Install FastAPI and Uvicorn
 RUN pip install -r requirements.txt
 
-# Copy the FastAPI app into the container
+# Copy the FastAPI app and test files into the container
 COPY main.py .
+COPY test_integration.py .
+COPY pytest.ini .
 
 # Expose port 80 for HTTP traffic
 EXPOSE 80

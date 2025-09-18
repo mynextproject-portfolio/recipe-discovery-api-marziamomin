@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app, recipes, next_id, Recipe
+from main import app
+from app.database import recipes, next_id
+from app.models import Recipe
 
 # Create test client
 client = TestClient(app)

@@ -12,6 +12,7 @@ RUN pip install -r requirements.txt
 
 # Copy the FastAPI app and test files into the container
 COPY main.py .
+COPY app/ ./app/
 COPY test_integration.py .
 COPY pytest.ini .
 

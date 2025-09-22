@@ -1,8 +1,46 @@
 import pytest
 from fastapi.testclient import TestClient
 from main import app
-from app.database import recipes, next_id
 from app.models import Recipe
+from app.repositories import InMemoryRecipeRepository, RecipeRepository
+from app.routers import recipes as recipes_router
+
+# Provide a fresh in-memory repository per test via dependency override
+@pytest.fixture(autouse=True)
+def override_repo_dependency():
+    seed = [
+        Recipe(
+            id=1,
+            title="Spaghetti Carbonara",
+            ingredients=["pasta", "eggs", "bacon", "cheese"],
+            steps=["Cook pasta", "Mix eggs", "Combine all"],
+            prepTime="10 minutes",
+            cookTime="15 minutes",
+            difficulty="Medium",
+            cuisine="Italian",
+        ),
+        Recipe(
+            id=2,
+            title="Chicken Tikka Masala",
+            ingredients=["chicken", "tomato", "onion", "garlic"],
+            steps=["Marinate chicken", "Cook sauce", "Combine and simmer"],
+            prepTime="20 minutes",
+            cookTime="30 minutes",
+            difficulty="Medium",
+            cuisine="Indian",
+        ),
+    ]
+
+    # Use a singleton instance per test to preserve state across requests
+    repo_instance: RecipeRepository = InMemoryRecipeRepository(seed=seed)
+
+    def _get_test_repo() -> RecipeRepository:
+        return repo_instance
+
+    app.dependency_overrides[recipes_router.get_repository] = _get_test_repo
+    yield
+    app.dependency_overrides.clear()
+
 
 # Create test client
 client = TestClient(app)
@@ -11,32 +49,8 @@ class TestIntegration:
     """Integration tests for Recipe Discovery API"""
     
     def setup_method(self):
-        """Reset the recipes list to initial state before each test"""
-        global recipes, next_id
-        recipes.clear()
-        recipes.extend([
-            Recipe(
-                id=1,
-                title="Spaghetti Carbonara",
-                ingredients=["pasta", "eggs", "bacon", "cheese"],
-                steps=["Cook pasta", "Mix eggs", "Combine all"],
-                prepTime="10 minutes",
-                cookTime="15 minutes",
-                difficulty="Medium",
-                cuisine="Italian",
-            ),
-            Recipe(
-                id=2,
-                title="Chicken Tikka Masala",
-                ingredients=["chicken", "tomato", "onion", "garlic"],
-                steps=["Marinate chicken", "Cook sauce", "Combine and simmer"],
-                prepTime="20 minutes",
-                cookTime="30 minutes",
-                difficulty="Medium",
-                cuisine="Indian",
-            )
-        ])
-        next_id = 3
+        """No global resets needed; dependency override provides clean state per test."""
+        pass
 
     def test_ping_endpoint(self):
         """Test GET /ping endpoint"""

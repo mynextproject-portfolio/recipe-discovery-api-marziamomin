@@ -1,53 +1,50 @@
-from fastapi import APIRouter, HTTPException, Response, status, Query
+from fastapi import APIRouter, HTTPException, Response, status, Query, Depends
 from typing import List, Optional
 from app.models import Recipe, RecipeCreate
-from app.database import recipes, next_id
+from app.repositories import RecipeRepository, InMemoryRecipeRepository
 
 router = APIRouter()
 
+
+# Default DI provider uses a singleton in-memory repository initialized from
+# current database state to preserve existing API behavior across requests.
+from app.database import recipes as initial_recipes
+_default_repo_instance: RecipeRepository = InMemoryRecipeRepository(seed=initial_recipes)
+
+
+def get_repository() -> RecipeRepository:
+    return _default_repo_instance
+
 @router.get("/recipes")
-async def get_all_recipes():
-    return {"recipes": [recipe.model_dump() for recipe in recipes]}
+async def get_all_recipes(repo: RecipeRepository = Depends(get_repository)):
+    return {"recipes": [recipe.model_dump() for recipe in repo.list_recipes()]}
 
 @router.get("/recipes/search")
-async def search_recipes(q: Optional[str] = Query(default=None)):
-    if not q:
-        return {"recipes": []}
-    q_lower = q.lower()
-    matches = [
-        r.model_dump() for r in recipes 
-        if q_lower in r.title.lower()    
-    ]
+async def search_recipes(q: Optional[str] = Query(default=None), repo: RecipeRepository = Depends(get_repository)):
+    matches = [r.model_dump() for r in repo.search_recipes(q)]
     return {"recipes": matches}
 
 @router.get("/recipes/{recipe_id}")
-async def get_recipe(recipe_id: int):
-    for recipe in recipes:
-        if recipe.id == recipe_id:
-            return recipe
-    raise HTTPException(status_code=404, detail="Recipe not found")
+async def get_recipe(recipe_id: int, repo: RecipeRepository = Depends(get_repository)):
+    recipe = repo.get_recipe(recipe_id)
+    if recipe is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return recipe
 
 @router.post("/recipes", status_code=status.HTTP_201_CREATED)
-async def create_recipe(payload: RecipeCreate):
-    global next_id
-    new_recipe = Recipe(id=next_id, **payload.model_dump())
-    recipes.append(new_recipe)
-    next_id += 1
-    return new_recipe
+async def create_recipe(payload: RecipeCreate, repo: RecipeRepository = Depends(get_repository)):
+    return repo.create_recipe(payload)
 
 @router.put("/recipes/{recipe_id}")
-async def update_recipe(recipe_id: int, payload: RecipeCreate):
-    for index, recipe in enumerate(recipes):
-        if recipe.id == recipe_id:
-            updated = Recipe(id=recipe_id, **payload.model_dump())
-            recipes[index] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Recipe not found")
+async def update_recipe(recipe_id: int, payload: RecipeCreate, repo: RecipeRepository = Depends(get_repository)):
+    updated = repo.update_recipe(recipe_id, payload)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return updated
 
 @router.delete("/recipes/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_recipe(recipe_id: int):
-    for index, recipe in enumerate(recipes):
-        if recipe.id == recipe_id:
-            del recipes[index]
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-    raise HTTPException(status_code=404, detail="Recipe not found")
+async def delete_recipe(recipe_id: int, repo: RecipeRepository = Depends(get_repository)):
+    deleted = repo.delete_recipe(recipe_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

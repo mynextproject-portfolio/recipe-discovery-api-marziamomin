@@ -1,19 +1,15 @@
 from fastapi import APIRouter, HTTPException, Response, status, Query, Depends
 from typing import List, Optional
 from app.models import Recipe, RecipeCreate
-from app.repositories import RecipeRepository, InMemoryRecipeRepository
+from app.repositories import RecipeRepository, SQLiteRecipeRepository
+from app.database import get_db, Session
 
 router = APIRouter()
 
 
-# Default DI provider uses a singleton in-memory repository initialized from
-# current database state to preserve existing API behavior across requests.
-from app.database import recipes as initial_recipes
-_default_repo_instance: RecipeRepository = InMemoryRecipeRepository(seed=initial_recipes)
-
-
-def get_repository() -> RecipeRepository:
-    return _default_repo_instance
+def get_repository(db: Session = Depends(get_db)) -> RecipeRepository:
+    """Dependency provider that returns a SQLite repository instance."""
+    return SQLiteRecipeRepository(db)
 
 @router.get("/recipes")
 async def get_all_recipes(repo: RecipeRepository = Depends(get_repository)):

@@ -55,7 +55,7 @@ class InMemoryRecipeRepository:
         return None
 
     def create_recipe(self, payload: RecipeCreate) -> Recipe:
-        new_recipe = Recipe(id=self._next_id, **payload.model_dump())
+        new_recipe = Recipe(id=self._next_id, source="internal", **payload.model_dump())
         self._recipes.append(new_recipe)
         self._next_id += 1
         return new_recipe
@@ -63,7 +63,7 @@ class InMemoryRecipeRepository:
     def update_recipe(self, recipe_id: int, payload: RecipeCreate) -> Optional[Recipe]:
         for index, recipe in enumerate(self._recipes):
             if recipe.id == recipe_id:
-                updated = Recipe(id=recipe_id, **payload.model_dump())
+                updated = Recipe(id=recipe_id, source="internal", **payload.model_dump())
                 self._recipes[index] = updated
                 return updated
         return None
@@ -157,7 +157,8 @@ class SQLiteRecipeRepository:
             prepTime=db_recipe.prepTime,
             cookTime=db_recipe.cookTime,
             difficulty=db_recipe.difficulty,
-            cuisine=db_recipe.cuisine
+            cuisine=db_recipe.cuisine,
+            source="internal"
         )
 
 

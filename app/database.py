@@ -46,6 +46,7 @@ initial_recipes: List[Recipe] = [
         cookTime="15 minutes",
         difficulty="Medium",
         cuisine="Italian",
+        source="internal",
     ),
     Recipe(
         id=2,
@@ -56,6 +57,7 @@ initial_recipes: List[Recipe] = [
         cookTime="30 minutes",
         difficulty="Medium",
         cuisine="Indian",
+        source="internal",
     ),
 ]
 

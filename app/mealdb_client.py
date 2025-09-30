@@ -2,12 +2,21 @@ import requests
 import re
 from typing import List, Optional, Dict, Any
 from app.models import Recipe
+from app.redis_client import RedisClient
 
 
 class MealDBClient:
-    """Client for interacting with TheMealDB API."""
+    """Client for interacting with TheMealDB API with Redis caching."""
     
     BASE_URL = "https://www.themealdb.com/api/json/v1/1"
+    
+    def __init__(self, redis_url: str = "redis://localhost:6379"):
+        """Initialize MealDB client with Redis caching.
+        
+        Args:
+            redis_url: Redis connection URL for caching
+        """
+        self.redis_client = RedisClient(redis_url)
     
     def search_meals_by_name(self, meal_name: str) -> List[Dict[str, Any]]:
         """
@@ -162,17 +171,33 @@ class MealDBClient:
     def search_recipes(self, query: Optional[str]) -> List[Recipe]:
         """
         Search for recipes in TheMealDB and convert to our Recipe format.
+        Uses Redis caching with 24-hour TTL to avoid repeated API calls.
         
         Args:
             query: Search query string
             
         Returns:
-            List of Recipe objects from TheMealDB
+            List of Recipe objects from TheMealDB (cached or fresh)
         """
         if not query or not query.strip():
             return []
             
-        # Search TheMealDB
+        # Check cache first
+        if self.redis_client and self.redis_client.is_available():
+            cached_recipes_data = self.redis_client.get_cached_results(query)
+            if cached_recipes_data:
+                # Convert cached data back to Recipe objects
+                recipes = []
+                for recipe_data in cached_recipes_data:
+                    try:
+                        recipe = Recipe(**recipe_data)
+                        recipes.append(recipe)
+                    except Exception as e:
+                        print(f"Error converting cached recipe: {e}")
+                        continue
+                return recipes
+        
+        # Cache miss - fetch from TheMealDB API
         meal_data_list = self.search_meals_by_name(query)
         
         # Convert to Recipe objects
@@ -184,5 +209,20 @@ class MealDBClient:
             except Exception as e:
                 print(f"Error converting MealDB recipe: {e}")
                 continue
+        
+        # Cache the results (24 hours = 86400 seconds)
+        if self.redis_client and self.redis_client.is_available():
+            # Convert Recipe objects to dictionaries for JSON serialization
+            recipes_data = []
+            for recipe in recipes:
+                try:
+                    recipe_dict = recipe.model_dump()
+                    recipes_data.append(recipe_dict)
+                except Exception as e:
+                    print(f"Error serializing recipe for cache: {e}")
+                    continue
+            
+            if recipes_data:
+                self.redis_client.cache_results(query, recipes_data, ttl_seconds=86400)
                 
         return recipes

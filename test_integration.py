@@ -18,6 +18,7 @@ def override_repo_dependency():
             cookTime="15 minutes",
             difficulty="Medium",
             cuisine="Italian",
+            source="internal",
         ),
         Recipe(
             id=2,
@@ -28,6 +29,7 @@ def override_repo_dependency():
             cookTime="30 minutes",
             difficulty="Medium",
             cuisine="Indian",
+            source="internal",
         ),
     ]
 
@@ -90,8 +92,14 @@ class TestIntegration:
         assert response.status_code == 200
         data = response.json()
         assert "recipes" in data
-        assert len(data["recipes"]) == 1
-        assert data["recipes"][0]["title"] == "Chicken Tikka Masala"
+        # Should return both internal and external recipes, so at least 1
+        assert len(data["recipes"]) >= 1
+        
+        # Find the internal recipe in the results
+        internal_recipe = next((r for r in data["recipes"] if r["source"] == "internal"), None)
+        assert internal_recipe is not None
+        assert internal_recipe["title"] == "Chicken Tikka Masala"
+        assert internal_recipe["id"] == 2
 
     def test_search_recipes_without_query(self):
         """Test GET /recipes/search endpoint without query parameter"""
@@ -106,16 +114,28 @@ class TestIntegration:
         response = client.get("/recipes/search?q=SPAGHETTI")
         assert response.status_code == 200
         data = response.json()
-        assert len(data["recipes"]) == 1
-        assert data["recipes"][0]["title"] == "Spaghetti Carbonara"
+        # Should return both internal and external recipes, so at least 1
+        assert len(data["recipes"]) >= 1
+        
+        # Find the internal recipe in the results
+        internal_recipe = next((r for r in data["recipes"] if r["source"] == "internal"), None)
+        assert internal_recipe is not None
+        assert internal_recipe["title"] == "Spaghetti Carbonara"
+        assert internal_recipe["id"] == 1
 
     def test_search_recipes_partial_match(self):
         """Test search functionality with partial matches"""
         response = client.get("/recipes/search?q=tikka")
         assert response.status_code == 200
         data = response.json()
-        assert len(data["recipes"]) == 1
-        assert data["recipes"][0]["title"] == "Chicken Tikka Masala"
+        # Should return both internal and external recipes, so at least 1
+        assert len(data["recipes"]) >= 1
+        
+        # Find the internal recipe in the results
+        internal_recipe = next((r for r in data["recipes"] if r["source"] == "internal"), None)
+        assert internal_recipe is not None
+        assert internal_recipe["title"] == "Chicken Tikka Masala"
+        assert internal_recipe["id"] == 2
 
     def test_search_recipes_no_matches(self):
         """Test search functionality with no matches"""
@@ -239,6 +259,7 @@ class TestIntegration:
         found_recipe = next((r for r in search_results["recipes"] if r["id"] == recipe_id), None)
         assert found_recipe is not None
         assert found_recipe["title"] == "Pasta Primavera"
+        assert found_recipe["source"] == "internal"
         
         # 4. Update the recipe
         updated_recipe = {
@@ -273,6 +294,7 @@ class TestIntegration:
         found_updated_recipe = next((r for r in updated_search_results["recipes"] if r["id"] == recipe_id), None)
         assert found_updated_recipe is not None
         assert found_updated_recipe["title"] == "Pasta Primavera Deluxe"
+        assert found_updated_recipe["source"] == "internal"
 
     def test_all_endpoints_exist(self):
         """Test that all required endpoints are accessible"""

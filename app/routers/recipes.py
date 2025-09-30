@@ -3,6 +3,7 @@ from typing import List, Optional
 from app.models import Recipe, RecipeCreate
 from app.repositories import RecipeRepository, SQLiteRecipeRepository
 from app.database import get_db, Session
+from app.mealdb_client import MealDBClient
 
 router = APIRouter()
 
@@ -17,7 +18,26 @@ async def get_all_recipes(repo: RecipeRepository = Depends(get_repository)):
 
 @router.get("/recipes/search")
 async def search_recipes(q: Optional[str] = Query(default=None), repo: RecipeRepository = Depends(get_repository)):
-    matches = [r.model_dump() for r in repo.search_recipes(q)]
+    """
+    Search for recipes in both internal database and TheMealDB.
+    Returns combined results with source field indicating origin.
+    """
+    if not q or not q.strip():
+        return {"recipes": []}
+    
+    # Search internal recipes
+    internal_recipes = repo.search_recipes(q)
+    
+    # Search external recipes from MealDB
+    mealdb_client = MealDBClient()
+    external_recipes = mealdb_client.search_recipes(q)
+    
+    # Combine results
+    all_recipes = internal_recipes + external_recipes
+    
+    # Convert to dict format for JSON response
+    matches = [r.model_dump() for r in all_recipes]
+    
     return {"recipes": matches}
 
 @router.get("/recipes/{recipe_id}")

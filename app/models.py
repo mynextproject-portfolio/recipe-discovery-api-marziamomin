@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class RecipeBase(BaseModel):
     title: str
@@ -14,4 +14,5 @@ class RecipeCreate(RecipeBase):
     pass
 
 class Recipe(RecipeBase):
-    id: int
+    id: Union[int, str]  # Can be int for internal recipes or str for external
+    source: str = "internal"  # "internal" for local recipes, "mealdb" for external
